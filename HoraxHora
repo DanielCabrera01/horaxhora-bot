@@ -14,13 +14,17 @@ ESTACIONES = [
     "pulido", "limpieza", "geometria", "armado", "etiquetas", "prueba"
 ]
 
+# Estados del bot
 PEDIR_HORA, REGISTRAR_PUNTAS = range(2)
+
 produccion_diaria = {}
 
+# /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("¿De qué horario ingresaremos las puntas?")
     return PEDIR_HORA
 
+# Al hacer clic en el botón
 async def boton_iniciar(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -30,6 +34,7 @@ async def boton_iniciar(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["resultados"] = {}
     return PEDIR_HORA
 
+# Recibe la hora
 async def recibir_hora(update: Update, context: ContextTypes.DEFAULT_TYPE):
     hora = update.message.text.strip().lower()
     if not re.match(r"\d+\s*[ap]m", hora):
@@ -44,9 +49,10 @@ async def recibir_hora(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"Ingresaremos puntas de las {hora} de {estacion_actual}.\n¿Cuánto produjo?")
     return REGISTRAR_PUNTAS
 
+# Registra producción
 async def registrar_puntas(update: Update, context: ContextTypes.DEFAULT_TYPE):
     entrada = update.message.text.strip()
-
+    
     try:
         if "*" in entrada:
             partes = entrada.split("*")
@@ -78,6 +84,7 @@ async def registrar_puntas(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(mensaje_registro)
 
+    # Avanzar a la siguiente estación
     estacion_index += 1
     if estacion_index >= len(ESTACIONES):
         await update.message.reply_text(f"✅ Todas las estaciones fueron registradas para las {hora}.")
@@ -88,6 +95,7 @@ async def registrar_puntas(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"¿Cuánto produjo {siguiente}?")
         return REGISTRAR_PUNTAS
 
+# /reporte 7am
 async def reporte(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if len(context.args) != 1:
         await update.message.reply_text("❌ Usa el comando así: /reporte 7am")
@@ -106,6 +114,7 @@ async def reporte(update: Update, context: ContextTypes.DEFAULT_TYPE):
         mensaje += f"• {estacion}: {cantidad}\n"
     await update.message.reply_text(mensaje)
 
+# /reporte_total
 async def reporte_total(update: Update, context: ContextTypes.DEFAULT_TYPE):
     fecha = datetime.now().strftime("%Y-%m-%d")
 
@@ -123,25 +132,30 @@ async def reporte_total(update: Update, context: ContextTypes.DEFAULT_TYPE):
         mensaje += f"• {estacion}: {total}\n"
     await update.message.reply_text(mensaje)
 
+# Cancelar
 async def cancelar(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("⛔ Registro cancelado.")
     return ConversationHandler.END
 
+# ⏰ Recordatorio cada hora
 async def enviar_recordatorio(context: ContextTypes.DEFAULT_TYPE):
-    chat_id = os.getenv("TELEGRAM_CHAT_ID")
+    chat_id = os.getenv("TELEGRAM_CHAT_ID")  # Debes definir tu chat_id en .env
     boton = InlineKeyboardMarkup([
         [InlineKeyboardButton("📤 Iniciar registro", callback_data="iniciar_registro")]
     ])
     hora_actual = datetime.now().strftime("%I:%M %p")
     await context.bot.send_message(chat_id=chat_id, text=f"⏰ Son las {hora_actual}. ¿Ya registraste las puntas?", reply_markup=boton)
 
+# MAIN
 if __name__ == "__main__":
     import dotenv
     dotenv.load_dotenv()
 
     TOKEN = os.getenv("TELEGRAM_TOKEN")
+
     app = ApplicationBuilder().token(TOKEN).build()
 
+    # Conversación de registro
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler("start", start)],
         states={
@@ -156,10 +170,11 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("reporte_total", reporte_total))
     app.add_handler(CallbackQueryHandler(boton_iniciar, pattern="^iniciar_registro$"))
 
+    # ⏱️ Scheduler para recordatorios
     scheduler = BackgroundScheduler()
     hora = time(8, 0)
     while hora <= time(18, 30):
-        scheduler.add_job(enviar_recordatorio, 'cron', hour=hora.hour, minute=hora.minute, args=[app])
+        scheduler.add_job(enviar_recordatorio, 'cron', hour=hora.hour, minute=hora.minute, args=[app.bot])
         hora = (datetime.combine(datetime.today(), hora) + timedelta(hours=1)).time()
     scheduler.start()
 
