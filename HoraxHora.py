@@ -1,3 +1,4 @@
+
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     ApplicationBuilder, CommandHandler, MessageHandler, filters,
@@ -52,7 +53,7 @@ async def recibir_hora(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # Registra producción
 async def registrar_puntas(update: Update, context: ContextTypes.DEFAULT_TYPE):
     entrada = update.message.text.strip()
-    
+
     try:
         if "*" in entrada:
             partes = entrada.split("*")
@@ -139,7 +140,7 @@ async def cancelar(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ⏰ Recordatorio cada hora
 async def enviar_recordatorio(context: ContextTypes.DEFAULT_TYPE):
-    chat_id = os.getenv("TELEGRAM_CHAT_ID")  # Debes definir tu chat_id en .env
+    chat_id = os.getenv("TELEGRAM_CHAT_ID")
     boton = InlineKeyboardMarkup([
         [InlineKeyboardButton("📤 Iniciar registro", callback_data="iniciar_registro")]
     ])
@@ -152,10 +153,8 @@ if __name__ == "__main__":
     dotenv.load_dotenv()
 
     TOKEN = os.getenv("TELEGRAM_TOKEN")
-
     app = ApplicationBuilder().token(TOKEN).build()
 
-    # Conversación de registro
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler("start", start)],
         states={
@@ -170,11 +169,10 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("reporte_total", reporte_total))
     app.add_handler(CallbackQueryHandler(boton_iniciar, pattern="^iniciar_registro$"))
 
-    # ⏱️ Scheduler para recordatorios
     scheduler = BackgroundScheduler()
     hora = time(8, 0)
     while hora <= time(18, 30):
-        scheduler.add_job(enviar_recordatorio, 'cron', hour=hora.hour, minute=hora.minute, args=[app.bot])
+        scheduler.add_job(enviar_recordatorio, 'cron', hour=hora.hour, minute=hora.minute, args=[app])
         hora = (datetime.combine(datetime.today(), hora) + timedelta(hours=1)).time()
     scheduler.start()
 
